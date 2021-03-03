@@ -1,6 +1,7 @@
 <?php
 namespace GDO\TestMethods\Test;
 
+use GDO\Tests\MethodTest;
 use GDO\Tests\TestCase;
 use GDO\Core\GDO;
 use GDO\Core\GDT_Response;
@@ -20,7 +21,7 @@ use function PHPUnit\Framework\assertEquals;
  * @version 6.10
  * @since 6.10
  */
-final class MethodTest extends TestCase
+final class MethodsAutoTest extends TestCase
 {
     function testGDOandGDTsyntax()
     {
