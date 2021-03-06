@@ -6,7 +6,6 @@ use GDO\Tests\TestCase;
 use GDO\Core\GDO;
 use GDO\Core\GDT_Response;
 use GDO\Core\ModuleLoader;
-use GDO\Cronjob\MethodCronjob;
 use GDO\Install\Installer;
 use GDO\File\Filewalker;
 use GDO\Form\MethodForm;
@@ -14,12 +13,16 @@ use GDO\Util\Strings;
 use function PHPUnit\Framework\assertTrue;
 use function PHPUnit\Framework\assertInstanceOf;
 use function PHPUnit\Framework\assertEquals;
+use function PHPUnit\Framework\assertGreaterThanOrEqual;
 
 /**
  * Auto coverage test.
+ * Includes all GDT and tries some basic make and nullable and conversion.
+ * Includes all GDO and tests basic blank data.
+ * Includes all Method and tries trivial ones automatically. Trivial methods have parameters that can be plugged automatically.
  * @author gizmore
- * @version 6.10
- * @since 6.10
+ * @version 6.10.1
+ * @since 6.10.0
  */
 final class MethodsAutoTest extends TestCase
 {
@@ -33,20 +36,24 @@ final class MethodsAutoTest extends TestCase
                      (Strings::startsWith($entry, 'GDO')))
                 {
                     require_once $fullpath;
+                    assertTrue(true, 'STUB assert. We check for crash only.');
                 }
             });
         }
     }
     
+    private $numMethods = 0;
     function testTrivialMethods()
     {
         $modules = ModuleLoader::instance()->getEnabledModules();
         foreach ($modules as $module)
         {
             Installer::loopMethods($module, function($entry, $fullpath, $method) {
+                $this->numMethods++;
                 require_once $fullpath;
             });
         }
+        assertGreaterThanOrEqual(1, $this->numMethods, 'Check if we included at least one more method for auto coverage.');
     }
 
     public function testEveryGDTConstructors()
@@ -107,78 +114,123 @@ final class MethodsAutoTest extends TestCase
         echo "{$count} GDO tested\n"; ob_flush();
     }
     
-    public function testAllTrivialMethodsFor200Code()
+    public function testAllTrivialMethodsForOKCode()
     {
+        $n = 1;
         $tested = 0;
         $passed = 0;
+        $skippedAuto = 0;
+        $skippedManual = 0;
         
         foreach (get_declared_classes() as $klass)
         {
             $parents = class_parents($klass);
             if (in_array('GDO\\Core\\Method', $parents, true))
             {
+                # Skip abstract
                 $k = new \ReflectionClass($klass);
                 if ($k->isAbstract())
                 {
                     continue;
                 }
                 
+                # Check others
                 /** @var $method \GDO\Core\Method **/
                 $method = call_user_func([$klass, 'make']);
+                $methodName =  $method->getModuleName() . '::' . $method->getMethodName();
+                echo "?.) Checking method {$methodName} to be trivial...\n"; ob_flush();
                 
-                if ( ($method instanceof MethodCronjob) || (!$method->isTrivial()) )
+                # Skip special marked
+                if (!$method->isTrivial())
                 {
+                    echo "{$methodName} is skipped because it is explicitly marked as not trivial.\n"; ob_flush();
+                    $skippedManual++;
                     continue;
                 }
                 
                 
-                $methodName =  $method->getModuleName() . '::' . $method->getMethodName();
-                
-                $requiredParams = $method->gdoParameterCache();
-                
-                if ($method instanceof MethodForm)
-                {
-                    /** @var $method \GDO\Form\GDT_Form **/
-                    $formParams = $method->getForm()->getFieldsRec();
-                    $requiredParams = array_merge($requiredParams, $formParams);
-                }
+                $fields = $method->gdoParameterCache();
                 
                 $parameters = [];
                 $getParameters = [];
                 $trivial = true;
                 
-                if ($requiredParams)
+                if ($fields)
                 {
-                    foreach ($requiredParams as $name => $gdt)
+                    foreach ($fields as $name => $gdt)
                     {
                         # Ouch looks not trivial
-                        if ( ($gdt->notNull) && ($gdt->initial === null) )
+                        if ( ($gdt->notNull) && ($gdt->toValue($gdt->initial) === null) )
                         {
                             $trivial = false;
                         }
                         
                         # But maybe now
-                        if ($var = MethodTest::make()->plugParam($gdt, $method))
+                        if (!$trivial)
                         {
-                            $parameters[$name] = $var;
-                            if (isset($method->gdoParameterCache()[$name]))
+                            if ($var = MethodTest::make()->plugParam($gdt, $method))
                             {
-                                $getParameters[$name] = $var;
+                                $getParameters[$name] = $_REQUEST[$name] = $_GET[$name] = $var;
+                                $trivial = true;
                             }
-                            $trivial = true;
+                            else
+                            {
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                if (!$trivial)
+                {
+                    echo "Skipping {$methodName} because it has weird get parameters.\n"; ob_flush();
+                    $skippedAuto++;
+                    continue;
+                }
+                
+                # Now check form
+                /** @var $method MethodForm **/
+                if ($method instanceof MethodForm)
+                {
+                    $method->init();
+                    $form = $method->getForm();
+                    $fields = $form->getFieldsRec();
+                    
+                    foreach ($fields as $name => $gdt)
+                    {
+                        # needs to be plugged
+                        if ( ($gdt->notNull) && ($gdt->toValue($gdt->initial) === null) )
+                        {
+                            $trivial = false;
+                        }
+                                
+                        # try to plug and be trivial again
+                        if (!$trivial)
+                        {
+                            if ($var = MethodTest::make()->plugParam($gdt, $method))
+                            {
+                                $frm = $form->name;
+                                $_REQUEST[$frm][$name] = $_POST[$frm][$name] = $var;
+                                $parameters[$name] = $var;
+                                $trivial = true;
+                            }
                         }
                         
                         # Or is it?
                         if (!$trivial)
                         {
-                            echo "Skipping method {$methodName}\n"; ob_flush();
+                            echo "Skipping {$methodName} because it has weird form parameters.\n"; ob_flush();
+                            $skippedAuto++;
                             break;
                         }
-                    }
-                }
+                    } # foreach form fields
+                } # is MethodForm
+                
+                # Execute trivial method
                 if ($trivial)
                 {
-                    echo "Running trivial method {$methodName}\n"; ob_flush();
+                    $n++;
+                    echo "$n.) Running trivial method {$methodName}\n"; ob_flush();
                     MethodTest::make()->user($this->gizmore())->method($method)->getParameters($getParameters)->parameters($parameters)->execute();
                     
                     $tested++;
@@ -186,10 +238,12 @@ final class MethodsAutoTest extends TestCase
                     {
                         $passed++;
                     }
-                }
-            }
-        }
-        assertEquals($tested, $passed, "Check if all trivial methods test fine.");
-    }
+                    assertEquals($tested, $passed, "$n.) $methodName should be trivially returning status code 200.");
+                } # trivial call
+            } # is Method
+        } # foreach classes
+        echo "Tested $tested trivial methods who all have passed.\n$skippedAuto have been skipped because they were unpluggable.\n$skippedManual have been manually skipped via config.\n";
+        ob_flush();
+    } # test func
 
 }
