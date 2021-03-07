@@ -14,6 +14,11 @@ use function PHPUnit\Framework\assertTrue;
 use function PHPUnit\Framework\assertInstanceOf;
 use function PHPUnit\Framework\assertEquals;
 use function PHPUnit\Framework\assertGreaterThanOrEqual;
+use GDO\ThemeSwitcher\GDO_Theme;
+use GDO\ThemeSwitcher\GDT_ThemeSwitcher;
+use GDO\ThemeSwitcher\Method\Set;
+use function PHPUnit\Framework\assertLessThanOrEqual;
+use GDO\Language\Trans;
 
 /**
  * Auto coverage test.
@@ -115,6 +120,50 @@ final class MethodsAutoTest extends TestCase
     }
     
     public function testAllTrivialMethodsForOKCode()
+    {
+        if (!module_enabled('ThemeSwitcher'))
+        {
+            echo "Testing all trivial methods with current theme.\n";
+            ob_flush();
+            $this->doAllMethods();
+        }
+        else
+        {
+            assertTrue(true);
+        }
+    }
+    
+    public function testAllThemesForAllTrivialMethods()
+    {
+        if (module_enabled('ThemeSwitcher'))
+        {
+            foreach (GDO_Theme::table()->all() as $theme)
+            {
+                $this->testThemeForAllMethods($theme);
+            }
+        }
+        else
+        {
+            assertTrue(true);
+            echo "Theme switcher is disabled. done.\n";
+            ob_flush();
+        }
+    }
+    
+    private function testThemeForAllMethods(GDO_Theme $theme)
+    {
+        echo "Testing all trivial methods with {$theme->displayName()}\n";
+        ob_flush();
+        
+        # Switch theme
+        MethodTest::make()->method(Set::make())->
+            getParameters(['theme' => $theme->getID()])->execute();
+        
+        # Do methods
+        $this->doAllMethods();
+    }
+    
+    private function doAllMethods()
     {
         $n = 1;
         $tested = 0;
@@ -246,4 +295,19 @@ final class MethodsAutoTest extends TestCase
         ob_flush();
     } # test func
 
+    public function testLanguageFilesForCompletion()
+    {
+        if (Trans::$MISS)
+        {
+            echo "The following lang keys are missing:\n\n";
+            foreach (Trans::$MISSING as $key)
+            {
+                echo " - $key\n";
+            }
+//             ob_flush();
+        }
+        
+        assertEquals(0, Trans::$MISS, 'Assert that no internationalization was missing.');
+    }
+    
 }
