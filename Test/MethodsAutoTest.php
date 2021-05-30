@@ -15,7 +15,6 @@ use function PHPUnit\Framework\assertInstanceOf;
 use function PHPUnit\Framework\assertEquals;
 use function PHPUnit\Framework\assertGreaterThanOrEqual;
 use GDO\ThemeSwitcher\GDO_Theme;
-use GDO\ThemeSwitcher\GDT_ThemeSwitcher;
 use GDO\ThemeSwitcher\Method\Set;
 use function PHPUnit\Framework\assertLessThanOrEqual;
 use GDO\Language\Trans;
@@ -77,6 +76,8 @@ final class MethodsAutoTest extends TestCase
                 {
                     continue;
                 }
+                
+                echo "Testing $klass\n";
                 
                 $gdt = call_user_func([$klass, 'make']);
                 $gdt->value(null);
