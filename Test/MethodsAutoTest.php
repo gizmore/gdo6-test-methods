@@ -77,7 +77,7 @@ final class MethodsAutoTest extends TestCase
                     continue;
                 }
                 
-                echo "Testing $klass\n";
+//                 echo "Testing $klass\n";
                 
                 $gdt = call_user_func([$klass, 'make']);
                 $gdt->value(null);
