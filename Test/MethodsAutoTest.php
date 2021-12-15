@@ -36,8 +36,8 @@ final class MethodsAutoTest extends TestCase
         foreach ($modules as $module)
         {
             Filewalker::traverse($module->filePath(), null, function($entry, $fullpath) {
-                if ( (Strings::startsWith($entry, 'GDT')) ||
-                     (Strings::startsWith($entry, 'GDO')))
+                if ( (str_starts_with($entry, 'GDT')) ||
+                     (str_starts_with($entry, 'GDO')))
                 {
                     require_once $fullpath;
                     assertTrue(true, 'STUB assert. We check for crash only.');
