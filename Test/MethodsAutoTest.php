@@ -9,7 +9,6 @@ use GDO\Core\ModuleLoader;
 use GDO\Install\Installer;
 use GDO\File\Filewalker;
 use GDO\Form\MethodForm;
-use GDO\Util\Strings;
 use function PHPUnit\Framework\assertTrue;
 use function PHPUnit\Framework\assertInstanceOf;
 use function PHPUnit\Framework\assertEquals;
@@ -188,12 +187,12 @@ final class MethodsAutoTest extends TestCase
                 /** @var $method \GDO\Core\Method **/
                 $method = call_user_func([$klass, 'make']);
                 $methodName =  $method->getModuleName() . '::' . $method->getMethodName();
-                echo "?.) Checking method {$methodName} to be trivial...\n"; ob_flush();
+//                 echo "?.) Checking method {$methodName} to be trivial...\n"; ob_flush();
                 
                 # Skip special marked
                 if (!$method->isTrivial())
                 {
-                    echo "{$methodName} is skipped because it is explicitly marked as not trivial.\n"; ob_flush();
+//                     echo "{$methodName} is skipped because it is explicitly marked as not trivial.\n"; ob_flush();
                     $skippedManual++;
                     continue;
                 }
@@ -233,7 +232,7 @@ final class MethodsAutoTest extends TestCase
                 
                 if (!$trivial)
                 {
-                    echo "Skipping {$methodName} because it has weird get parameters.\n"; ob_flush();
+//                     echo "Skipping {$methodName} because it has weird get parameters.\n"; ob_flush();
                     $skippedAuto++;
                     continue;
                 }
@@ -269,7 +268,7 @@ final class MethodsAutoTest extends TestCase
                         # Or is it?
                         if (!$trivial)
                         {
-                            echo "Skipping {$methodName} because it has weird form parameters.\n"; ob_flush();
+//                             echo "Skipping {$methodName} because it has weird form parameters.\n"; ob_flush();
                             $skippedAuto++;
                             break;
                         }
@@ -279,20 +278,27 @@ final class MethodsAutoTest extends TestCase
                 # Execute trivial method
                 if ($trivial)
                 {
-                    $n++;
-                    echo "$n.) Running trivial method {$methodName}\n"; ob_flush();
-                    MethodTest::make()->user($this->gizmore())->method($method)->getParameters($getParameters)->parameters($parameters)->execute();
-                    
-                    $tested++;
-                    if (GDT_Response::$CODE === 200)
-                    {
-                        $passed++;
-                    }
-                    assertEquals($tested, $passed, "$n.) $methodName should be trivially returning status code 200.");
+                	try
+                	{
+	                    $n++;
+// 	                    echo "$n.) Running trivial method {$methodName}\n"; ob_flush();
+	                    MethodTest::make()->user($this->gizmore())->method($method)->getParameters($getParameters)->parameters($parameters)->execute();
+	                    
+	                    $tested++;
+	                    if (GDT_Response::$CODE === 200)
+	                    {
+	                        $passed++;
+	                    }
+	                    assertEquals(GDT_Response::$CODE, 200, "$n.) $methodName should be trivially returning status code 200.");
+                	}
+                	catch (\Throwable $ex)
+                	{
+                		echo "$n.) {$methodName} failed!\n"; ob_flush();
+                	}
                 } # trivial call
             } # is Method
         } # foreach classes
-        echo "Tested $tested trivial methods who all have passed.\n$skippedAuto have been skipped because they were unpluggable.\n$skippedManual have been manually skipped via config.\n";
+        echo "Tested $tested trivial methods.\n$skippedAuto have been skipped because they were unpluggable.\n$skippedManual have been manually skipped via config.\n";
         ob_flush();
     } # test func
 
